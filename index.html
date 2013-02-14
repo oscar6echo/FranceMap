@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script type="text/javascript" src="svg_todataurl.js"></script> 
+
+<style>
+#title {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 20px;
+  text-align: left;
+}
+
+.location {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+#dpt {
+  stroke: #fff;
+  stroke-width: 0.5px;
+  opacity: 0.90;
+}
+
+#dpt .active {
+  
+}
+
+#background {
+  fill: none;
+  stroke: black;
+  stroke-width: 2px;
+  pointer-events: all;
+}
+
+}
+</style>
+
+</body>
+
+<h3 id="title">Régions and Départements of France</h3>
+<p class="location reg">Région: </p>
+<p class="location dptName">Département: </p>
+<p class="location dptNb">No du Département: </p>
+<p id="map"></p>
+
+<script>
+var width = 800,
+    height = 700,
+    focused = null,
+    geoPath;
+
+var test;
+
+var svg = d3.select("#map")
+  .append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+svg.append("rect")
+    .attr("id", "background")
+    .attr("width", width)
+    .attr("height", height);
+
+var g = svg.append("g")
+    .attr("id", "dpt");
+
+var reg = d3.select(".location.reg");
+var dptName = d3.select(".location.dptName");
+var dptNb = d3.select(".location.dptNb");
+
+d3.json("./adm2.json", function(collection) {
+
+  var bounds = d3.geo.bounds(collection),
+      bottomLeft = bounds[0],
+      topRight = bounds[1],
+      rotLong = -(topRight[0]+bottomLeft[0])/2,
+      center = [(topRight[0]+bottomLeft[0])/2+rotLong, (topRight[1]+bottomLeft[1])/2],
+      
+      projection = d3.geo.albers()
+        .parallels([bottomLeft[1],topRight[1]])
+        .rotate([rotLong,0,0])
+        .translate([width/2,height/2])
+        .center(center),
+        
+      bottomLeftPx = projection(bottomLeft),
+      topRightPx = projection(topRight),
+      scaleFactor = 0.95*Math.min(width/(topRightPx[0]-bottomLeftPx[0]), height/(-topRightPx[1]+bottomLeftPx[1]));
+      
+  //.scale(4*1000)  //1000 is default for USA map
+  projection.scale(scaleFactor*1000); 
+
+  geoPath = d3.geo.path().projection(projection);
+
+  var fill = d3.scale.category20b();
+  
+  g.selectAll("path")
+      .data(collection.features)
+      .enter()
+    .append("path")
+      .attr("d", geoPath)
+      .attr("fill", function (d) {return fill(d.properties.ID_1)})
+      .on("mouseover", mouseoverPath)
+      .on("mouseout", mouseoutPath)
+      .on("click", clickPath);
+
+  // console.log("d3.json: bounds = "+bounds);
+  // console.log("d3.json: bottomLeft = "+bottomLeft);
+  // console.log("d3.json: topRight = "+topRight);
+  // console.log("d3.json: center = "+center);
+  // console.log("d3.json: projection(center) = "+projection(center));
+  // console.log("d3.json: projection(bottomLeft) = "+projection(bottomLeft));
+  // console.log("d3.json: projection(topRight) = "+projection(topRight));
+  // console.log("d3.json: topRightPx = "+topRightPx);
+  // console.log("d3.json: bottomLeftPx = "+bottomLeftPx);
+  // console.log("d3.json: scaleFactor x axis = "+width/(topRightPx[0]-bottomLeftPx[0]));
+  // console.log("d3.json: scaleFactor y axis = "+height/(-topRightPx[1]+bottomLeftPx[1]));  
+  // console.log("d3.json: scaleFactor = "+scaleFactor);
+
+});
+
+function mouseoverPath(d) {
+  reg.text("Région: "+d.properties.NAME_1);
+  dptName.text("Département: "+d.properties.NAME_2);
+  dptNb.text("No du Départements: "+d.properties.ID_2);
+}
+
+function mouseoutPath(d) {
+  reg.text("Région: ");
+  dptName.text("Département: ");
+  dptNb.text("No du Départements: ");
+}
+
+function clickPath(d) {
+  var x = width/2,
+      y = height/2,
+      k = 1,
+      reg = d.properties.NAME_1;
+  
+  if ((focused === null) || !(focused === reg)) {
+    var centroid = geoPath.centroid(d),
+        x = +centroid[0],
+        y = +centroid[1],
+        k = 2.5;
+    focused = reg;
+  } else {
+    focused = null;
+}
+
+g.selectAll("path")
+  .classed("active", focused && function(d) { return d.properties.NAME_1 === reg; })
+  .transition()
+  .duration(700)
+  .attr("transform", "translate("+ (width/2) +","+ (height/2) +")scale("+ k +")translate("+ (-x) +","+ (-y) +")")
+  .style("stroke-width", 0.5/k +"px");
+}
+
+</script>
+
+</body>
